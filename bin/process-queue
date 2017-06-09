@@ -14,18 +14,33 @@ $bootstrap = str_replace('__FILE__', "'".getcwd().'/bootstrap.php'."'", $bootstr
 eval($bootstrap);
 
 $lastChecked = null;
-while(true) {
+while (true) {
     if (\Kwf_Cache_Simple::fetch('kwf-queue-has-workload') || !$lastChecked || time()-$lastChecked > 60*5) {
+        \Kwf_Cache_Simple::delete('kwf-queue-has-workload');
         $lastChecked = time();
         $m = Kwf_Model_Abstract::getInstance('Kwf\Queue\QueueModel');
         $s = new Kwf_Model_Select();
         $s->whereEquals('status', 'queued');
         $s->order('created', 'DESC');
-        $row = $m->getRow($s);
-        $row->run();
-        $row->status = 'done';
-        $row->finished = date('Y-m-d H:i:s');
-        $row->save();
+        while (true) {
+            $row = $m->getRow($s);
+            if (!$row) break;
+            $row->status = 'running';
+            $row->started = date('Y-m-d H:i:s');
+            $row->save();
+            $cmd = "./vendor/bin/run-queue-job $row->id";
+            $process = new Symfony\Component\Process\Process($cmd);
+            $process->start(function ($type, $buffer) use ($m, $row) {
+                Kwf_Registry::get('db')->query("UPDATE {$m->getTableName()} SET log=CONCAT(log, ?) WHERE id=?", array($buffer, $row->id));
+            });
+            $process->wait();
+            if ($process->isSuccessful()) {
+                $row->status = 'finished';
+            } else {
+                $row->status = 'failed';
+            }
+            $row->save();
+        }
     }
     sleep(1);
 }

@@ -14,5 +14,8 @@
             "Kwf\\Queue\\": "src/"
         }
     },
-    "bin": ["bin/process-queue"]
+    "bin": [
+        "bin/process-queue",
+        "bin/run-queue-job"
+    ]
 }

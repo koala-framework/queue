@@ -1,6 +1,6 @@
 <?php
 namespace Kwf\Queue;
-interface Job
+interface JobInterface
 {
-    public function run(QueueRow $job);
+    public function run($payload);
 }

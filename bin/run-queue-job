@@ -1,0 +1,18 @@
+#!/usr/bin/php
+<?php
+if (!file_exists('bootstrap.php')) {
+    echo "ERROR: Start this script with web in your cwd.\n";
+    exit(1);
+}
+$bootstrap = file_get_contents('bootstrap.php');
+if (!preg_match('#^<\\?php(.*::setUp\\(\\);)#ms', $bootstrap, $m)) {
+    echo "ERROR: couldn't parse bootstrap.\n";
+    exit(1);
+}
+$bootstrap = $m[1];
+$bootstrap = str_replace('__FILE__', "'".getcwd().'/bootstrap.php'."'", $bootstrap);
+eval($bootstrap);
+
+$m = Kwf_Model_Abstract::getInstance('Kwf\Queue\QueueModel');
+$row = $m->getRow($_SERVER['argv'][1]);
+$row->run();
