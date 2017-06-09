@@ -1,0 +1,31 @@
+#!/usr/bin/php
+<?php
+if (!file_exists('bootstrap.php')) {
+    echo "ERROR: Start this script with web in your cwd.\n";
+    exit(1);
+}
+$bootstrap = file_get_contents('bootstrap.php');
+if (!preg_match('#^<\\?php(.*::setUp\\(\\);)#ms', $bootstrap, $m)) {
+    echo "ERROR: couldn't parse bootstrap.\n";
+    exit(1);
+}
+$bootstrap = $m[1];
+$bootstrap = str_replace('__FILE__', "'".getcwd().'/bootstrap.php'."'", $bootstrap);
+eval($bootstrap);
+
+$lastChecked = null;
+while(true) {
+    if (\Kwf_Cache_Simple::fetch('kwf-queue-has-workload') || !$lastChecked || time()-$lastChecked > 60*5) {
+        $lastChecked = time();
+        $m = Kwf_Model_Abstract::getInstance('Kwf\Queue\QueueModel');
+        $s = new Kwf_Model_Select();
+        $s->whereEquals('status', 'queued');
+        $s->order('created', 'DESC');
+        $row = $m->getRow($s);
+        $row->run();
+        $row->status = 'done';
+        $row->finished = date('Y-m-d H:i:s');
+        $row->save();
+    }
+    sleep(1);
+}
